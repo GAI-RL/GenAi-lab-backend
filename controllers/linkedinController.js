@@ -29,13 +29,49 @@ const createPost = async (req, res) => {
   try {
     const { post_id, text, image_url, post_url, created_at } = req.body;
 
-    if (!post_id || !text || !post_url || !created_at) {
+    // Validate LinkedIn post URL
+    let isValidPostUrl = false;
+
+    try {
+      const url = new URL(post_url);
+      isValidPostUrl = url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      isValidPostUrl = false;
+    }
+
+    // Validate image URL (optional)
+    let isValidImageUrl = true;
+
+    if (image_url) {
+      try {
+        const url = new URL(image_url);
+        isValidImageUrl = url.protocol === "https:" || url.protocol === "http:";
+      } catch {
+        isValidImageUrl = false;
+      }
+    }
+
+    // Check all required fields
+    if (
+      !isValidPostUrl ||
+      !isValidImageUrl ||
+      typeof post_id !== "string" ||
+      !post_id.trim() ||
+      typeof text !== "string" ||
+      !text.trim() ||
+      typeof post_url !== "string" ||
+      !post_url.trim() ||
+      typeof created_at !== "string" ||
+      !created_at.trim() ||
+      isNaN(Date.parse(created_at))
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Missing required post fields",
+        message: "Invalid or missing post fields",
       });
     }
 
+    // Insert post into Supabase
     const { data, error } = await supabase
       .from("linkedin_posts")
       .insert([
@@ -50,6 +86,7 @@ const createPost = async (req, res) => {
       .select()
       .single();
 
+    // Handle duplicate posts
     if (error) {
       if (error.code === "23505") {
         return res.status(409).json({
